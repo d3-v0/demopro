@@ -1,0 +1,16 @@
+# simple_calculator.py
+def add_numbers(a, b):
+    return a + b
+
+def main():
+    print("Chương trình tính tổng hai số")
+    try:
+        num1 = float(input("Nhập số thứ nhất: "))
+        num2 = float(input("Nhập số thứ hai: "))
+        result = add_numbers(num1, num2)
+        print(f"Tổng của {num1} và {num2} là: {result}")
+    except ValueError:
+        print("Vui lòng nhập số hợp lệ!")
+
+if __name__ == "__main__":
+    main()
