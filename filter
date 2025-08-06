@@ -1,0 +1,30 @@
+import pandas as pd
+
+# 1. Đọc file Excel
+try:
+    df = pd.read_excel('sales_data.xlsx')
+    print("Dữ liệu ban đầu:\n", df)
+except FileNotFoundError:
+    print("Lỗi: Không tìm thấy file 'sales_data.xlsx'.")
+    exit()
+
+# 2. Lọc dữ liệu
+# Ví dụ 1: Lọc các dòng có 'Sản Phẩm' là 'A'
+filtered_df_A = df[df['Sản Phẩm'] == 'A']
+print("\n---")
+print("Dữ liệu lọc theo Sản Phẩm 'A':\n", filtered_df_A)
+
+# Ví dụ 2: Lọc các dòng có 'Doanh Thu' lớn hơn 150
+filtered_df_high_sales = df[df['Doanh Thu'] > 150]
+print("\n---")
+print("Dữ liệu lọc theo Doanh Thu > 150:\n", filtered_df_high_sales)
+
+# Ví dụ 3: Lọc kết hợp nhiều điều kiện (Sản Phẩm là 'B' VÀ Khu Vực là 'Nam')
+filtered_df_B_Nam = df[(df['Sản Phẩm'] == 'B') & (df['Khu Vực'] == 'Nam')]
+print("\n---")
+print("Dữ liệu lọc theo Sản Phẩm 'B' và Khu Vực 'Nam':\n", filtered_df_B_Nam)
+
+# 3. Lưu kết quả lọc vào file Excel mới
+filtered_df_B_Nam.to_excel('filtered_sales_B_Nam.xlsx', index=False)
+print("\n---")
+print("Đã lưu kết quả lọc vào file 'filtered_sales_B_Nam.xlsx'")
