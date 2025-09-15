@@ -1,0 +1,101 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <sstream>
+
+// Struct để lưu thông tin người dùng
+struct User {
+    std::string name;
+    int id;
+};
+
+// Hàm để đọc dữ liệu từ file và lưu vào vector
+std::vector<User> readUsersFromFile(const std::string& filename) {
+    std::vector<User> users;
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Lỗi: Không thể mở file " << filename << std::endl;
+        return users;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string name_str, id_str;
+        
+        // Đọc tên
+        std::getline(ss, name_str, ',');
+        
+        // Đọc mã số
+        std::getline(ss, id_str);
+        
+        try {
+            User u;
+            u.name = name_str;
+            u.id = std::stoi(id_str); // Chuyển đổi string sang int
+            users.push_back(u);
+        } catch (const std::exception& e) {
+            std::cerr << "Lỗi xử lý dữ liệu: " << e.what() << std::endl;
+        }
+    }
+    file.close();
+    return users;
+}
+
+// Hàm để lọc danh sách người dùng theo tên
+std::vector<User> filterByName(const std::vector<User>& users, const std::string& name) {
+    std::vector<User> filtered_users;
+    for (const auto& user : users) {
+        if (user.name == name) {
+            filtered_users.push_back(user);
+        }
+    }
+    return filtered_users;
+}
+
+// Hàm để lọc danh sách người dùng theo mã số
+std::vector<User> filterById(const std::vector<User>& users, int id) {
+    std::vector<User> filtered_users;
+    for (const auto& user : users) {
+        if (user.id == id) {
+            filtered_users.push_back(user);
+        }
+    }
+    return filtered_users;
+}
+
+// Hàm để in danh sách người dùng ra màn hình
+void printUsers(const std::vector<User>& users) {
+    if (users.empty()) {
+        std::cout << "Không tìm thấy người dùng nào." << std::endl;
+        return;
+    }
+    std::cout << "Danh sách người dùng:" << std::endl;
+    for (const auto& user : users) {
+        std::cout << "Tên: " << user.name << ", Mã số: " << user.id << std::endl;
+    }
+}
+
+int main() {
+    std::string filename = "users.txt";
+    std::vector<User> all_users = readUsersFromFile(filename);
+
+    if (all_users.empty()) {
+        return 1;
+    }
+
+    // Ví dụ 1: Lọc người dùng theo tên
+    std::cout << "--- Lọc người dùng theo tên 'Bob' ---" << std::endl;
+    std::vector<User> filtered_by_name = filterByName(all_users, "Bob");
+    printUsers(filtered_by_name);
+
+    std::cout << std::endl;
+
+    // Ví dụ 2: Lọc người dùng theo mã số
+    std::cout << "--- Lọc người dùng theo mã số 104 ---" << std::endl;
+    std::vector<User> filtered_by_id = filterById(all_users, 104);
+    printUsers(filtered_by_id);
+    
+    return 0;
+}
