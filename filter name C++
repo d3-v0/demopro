@@ -1,0 +1,76 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <OpenXLSX.hpp>
+
+using namespace OpenXLSX;
+
+int main() {
+    // Tên tệp Excel và tên trang tính
+    std::string tenTep = "danh_sach_ten.xlsx";
+    std::string tenTrangTinh = "Sheet1"; // Thường là "Sheet1" theo mặc định
+
+    try {
+        // Mở tệp Excel
+        XLDocument doc;
+        doc.open(tenTep);
+
+        // Chọn trang tính mong muốn
+        auto wks = doc.workbook().worksheet(tenTrangTinh);
+
+        // Lấy số hàng cuối cùng trong cột A có dữ liệu
+        unsigned int soHangCuoi = wks.rowCount();
+
+        std::cout << "--- Bat dau phan tich ten trong tep " << tenTep << " ---" << std::endl;
+
+        // Vector để lưu trữ danh sách tên
+        std::vector<std::string> danhSachTen;
+
+        // Lặp qua tất cả các hàng trong cột A (cột 1)
+        for (unsigned int hang = 1; hang <= soHangCuoi; ++hang) {
+            // Lấy giá trị từ ô trong cột A
+            std::string ten = wks.cell("A" + std::to_string(hang)).value().get<std::string>();
+
+            // Kiểm tra xem ô có rỗng không
+            if (!ten.empty()) {
+                danhSachTen.push_back(ten);
+            }
+        }
+
+        // --- Phan tich du lieu ---
+        // Tại đây, bạn có thể thực hiện các thao tác phân tích tên
+        // Ví dụ: Đếm số lượng tên, tìm tên dài nhất, ngắn nhất, v.v.
+
+        // Ví dụ 1: In tất cả các tên ra màn hình
+        std::cout << "\nDanh sach ten tim thay:" << std::endl;
+        for (const auto& ten : danhSachTen) {
+            std::cout << "- " << ten << std::endl;
+        }
+
+        // Ví dụ 2: Đếm tổng số tên
+        std::cout << "\nTong so ten: " << danhSachTen.size() << std::endl;
+
+        // Ví dụ 3: Tìm tên dài nhất
+        if (!danhSachTen.empty()) {
+            std::string tenDaiNhat = danhSachTen[0];
+            for (const auto& ten : danhSachTen) {
+                if (ten.length() > tenDaiNhat.length()) {
+                    tenDaiNhat = ten;
+                }
+            }
+            std::cout << "Ten dai nhat la: " << tenDaiNhat << std::endl;
+        }
+
+        // Đóng tệp Excel
+        doc.close();
+
+    } catch (const std::exception& e) {
+        // Bắt và hiển thị lỗi nếu có vấn đề (ví dụ: không tìm thấy tệp)
+        std::cerr << "Loi: " << e.what() << std::endl;
+        return 1; // Trả về mã lỗi
+    }
+
+    std::cout << "\n--- Hoan thanh phan tich ---" << std::endl;
+
+    return 0; // Chương trình kết thúc thành công
+}
