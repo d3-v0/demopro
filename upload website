@@ -1,0 +1,103 @@
+from flask import Flask, request, render_template_string
+
+# Khởi tạo ứng dụng Flask
+app = Flask(__name__)
+
+# --- Cấu trúc HTML (Nhúng vào Python) ---
+# Đây là template cho trang nhập liệu và trang kết quả
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f7f7f7; }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-2xl border border-gray-100">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">{{ title }}</h1>
+
+        {% if form_content %}
+            <!-- HIỂN THỊ FORM NHẬP LIỆU -->
+            <p class="text-sm text-gray-500 mb-6">Sử dụng biểu mẫu bên dưới để nhập nội dung mới cho website.</p>
+            <form action="/submit" method="post" class="space-y-4">
+                <div class="flex flex-col">
+                    <label for="post_title" class="mb-1 font-semibold text-gray-700">Tiêu đề bài viết:</label>
+                    <input type="text" id="post_title" name="post_title" required 
+                           class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                           placeholder="Nhập tiêu đề...">
+                </div>
+                <div class="flex flex-col">
+                    <label for="post_content" class="mb-1 font-semibold text-gray-700">Nội dung bài viết:</label>
+                    <textarea id="post_content" name="post_content" rows="8" required 
+                              class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 resize-y"
+                              placeholder="Nhập nội dung chi tiết..."></textarea>
+                </div>
+                <button type="submit" 
+                        class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition duration-200 shadow-md hover:shadow-lg">
+                    Đưa lên Website (Giả định)
+                </button>
+            </form>
+        {% elif result_content %}
+            <!-- HIỂN THỊ KẾT QUẢ ĐÃ NHẬP -->
+            <div class="bg-green-50 border border-green-200 p-4 rounded-lg mb-6">
+                <p class="font-semibold text-green-700">Nội dung đã được ghi nhận thành công (Giả định)!</p>
+            </div>
+            
+            <div class="border p-6 rounded-lg bg-gray-50 shadow-inner">
+                <h2 class="text-2xl font-bold text-blue-700 mb-4">{{ post_title }}</h2>
+                <div class="whitespace-pre-wrap text-gray-800 leading-relaxed">{{ post_content }}</div>
+            </div>
+
+            <a href="/" 
+               class="mt-6 inline-block text-blue-600 hover:text-blue-800 font-medium">
+               &larr; Quay lại trang nhập liệu
+            </a>
+        {% endif %}
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/', methods=['GET'])
+def input_page():
+    """Hiển thị form nhập liệu."""
+    return render_template_string(HTML_TEMPLATE, 
+                                  title="Nhập Nội Dung Website Bằng Python", 
+                                  form_content=True)
+
+@app.route('/submit', methods=['POST'])
+def submit_content():
+    """Nhận và xử lý dữ liệu từ form."""
+    
+    # Lấy dữ liệu từ form (request.form)
+    post_title = request.form.get('post_title')
+    post_content = request.form.get('post_content')
+
+    # --- PHẦN XỬ LÝ (TƯƠNG ĐƯƠNG VỚI VIỆC ĐƯA LÊN WEBSITE) ---
+    # Trong môi trường thực tế, đây là nơi bạn sẽ:
+    # 1. Lưu dữ liệu vào cơ sở dữ liệu (như Firestore, MySQL, v.v.)
+    # 2. Xử lý các tag HTML hoặc Markdown.
+    # 3. Gửi đến một API của hệ thống quản lý nội dung (CMS)
+
+    # Hiện tại, chúng ta chỉ in ra console để xác nhận và hiển thị lại kết quả
+    print("\n--- DỮ LIỆU MỚI ĐƯỢC NHẬP ---")
+    print(f"Tiêu đề: {post_title}")
+    print(f"Nội dung:\n{post_content}")
+    print("-----------------------------\n")
+    
+    # Trả về trang hiển thị kết quả đã nhập
+    return render_template_string(HTML_TEMPLATE,
+                                  title="Kết Quả Đã Gửi",
+                                  result_content=True,
+                                  post_title=post_title,
+                                  post_content=post_content)
+
+# Chạy ứng dụng web
+if __name__ == '__main__':
+    # Đặt debug=True để tự động reload khi bạn thay đổi code
+    app.run(debug=True)
