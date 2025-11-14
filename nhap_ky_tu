@@ -1,0 +1,34 @@
+# Khai báo và mô tả hàm input()
+# Hàm input() sẽ tạm dừng chương trình và chờ người dùng nhập dữ liệu từ bàn phím.
+# Dữ liệu được nhập sẽ luôn là kiểu chuỗi (string).
+
+# 1. Nhập một chuỗi ký tự (Tên)
+# Chuỗi bên trong dấu ngoặc kép là lời nhắc (prompt) hiển thị cho người dùng
+name = input("Xin mời nhập tên của bạn: ")
+
+# 2. Nhập một số (Tuổi)
+# Dữ liệu ban đầu là chuỗi, nên cần phải chuyển đổi sang kiểu số nguyên (int)
+age_str = input("Xin mời nhập tuổi của bạn: ")
+
+# Xử lý chuyển đổi kiểu dữ liệu
+try:
+    age = int(age_str)
+except ValueError:
+    age = "KHÔNG HỢP LỆ"
+    print("Lỗi: Tuổi phải là một số nguyên.")
+
+# 3. Nhập một câu/đoạn văn
+paragraph = input("Xin mời nhập một câu (bấm Enter để kết thúc): ")
+
+# 4. In kết quả đã nhập ra màn hình
+print("\n--- KẾT QUẢ ĐÃ NHẬP ---")
+print(f"Tên bạn là: {name} (Kiểu dữ liệu: {type(name).__name__})")
+print(f"Tuổi của bạn là: {age} (Kiểu dữ liệu: {type(age).__name__ if age != 'KHÔNG HỢP LỆ' else 'string'})")
+print(f"Nội dung bạn nhập là: {paragraph}")
+print("--------------------------")
+
+# Ví dụ về một phép tính cơ bản
+if type(age) == int:
+    print(f"Năm sinh (ước tính) của bạn là: {2024 - age}")
+else:
+    print("Không thể tính năm sinh do dữ liệu tuổi không hợp lệ.")
