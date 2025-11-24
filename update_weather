@@ -1,0 +1,43 @@
+import requests
+import datetime
+import os
+from time import sleep
+
+# ================================
+# CẬP NHẬT THỜI TIẾT - Python 2025
+# API miễn phí từ OpenWeatherMap
+# ================================
+
+# Bước 1: Đăng ký miễn phí tại https://openweathermap.org/api
+# → Nhận API Key (miễn phí 1000 lượt gọi/ngày)
+API_KEY = "NHẬP_API_KEY_CỦA_BẠN_VÀO_ĐÂY"  # ← Thay bằng key thật của bạn
+
+# Thành phố mặc định (có thể thay đổi)
+CITY = "Hanoi"          # Thay thành "Ho Chi Minh City", "Da Nang", "London",...
+COUNTRY_CODE = "VN"     # Mã quốc gia (VN, US, JP,...)
+
+# Link API
+URL = f"http://api.openweathermap.org/data/2.5/weather?q={CITY},{COUNTRY_CODE}&appid={API_KEY}&units=metric&lang=vi"
+
+def lay_thoi_tiet():
+    try:
+        response = requests.get(URL)
+        if response.status_code == 401:
+            print("Lỗi: API Key không đúng hoặc chưa kích hoạt!")
+            return None
+        if response.status_code != 200:
+            print(f"Lỗi {response.status_code}: Không lấy được dữ liệu.")
+            return None
+            
+        data = response.json()
+        
+        # Lấy thông tin cần thiết
+        thanh_pho = data['name']
+        quoc_gia = data['sys']['country']
+        nhiet_do = data['main']['temp']
+        nhiet_do_cam_giac = data['main']['feels_like']
+        do_am = data['main']['humidity']
+        mo_ta = data['weather'][0]['description'].capitalize()
+        icon = data['weather'][0]['icon']
+        toc_do_gio = data['wind']['speed']
+        thoi_gian = datetime.datetime.now().strftime
