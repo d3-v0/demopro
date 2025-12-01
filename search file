@@ -1,0 +1,22 @@
+from office365.runtime.auth.user_credential import UserCredential
+from office365.sharepoint.client_context import ClientContext
+from office365.sharepoint.files.file import File
+
+# === CẤU HÌNH ===
+SITE_URL = "https://yourcompany.sharepoint.com/sites/YourSite"  # Thay bằng site của bạn
+USERNAME = "your_email@yourcompany.com"
+PASSWORD = "your_password_or_use_app_password"
+
+# Tên file hoặc từ khóa cần tìm (có hỗ trợ partial match)
+SEARCH_QUERY = "hợp đồng"   # Ví dụ: tìm file có chữ "hợp đồng"
+
+def search_files_in_site():
+    # Kết nối SharePoint
+    ctx = ClientContext(SITE_URL).with_credentials(
+        UserCredential(USERNAME, PASSWORD)
+    )
+
+    # Tìm kiếm toàn bộ site (bao gồm tất cả thư mục và thư viện tài liệu)
+    print(f"Đang tìm kiếm file chứa: '{SEARCH_QUERY}'...\n")
+    
+    # Sử dụng SharePoint Search API (
