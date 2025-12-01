@@ -1,0 +1,125 @@
+// search_sharepoint_cpp.cpp
+#include <windows.h>
+#include <winhttp.h>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <json/json.h>  // Dùng jsoncpp: https://github.com/open-source-parsers/jsoncpp
+
+#pragma comment(lib, "winhttp.lib")
+
+std::wstring s2ws(const std::string& str) {
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), NULL, 0);
+    std::wstring wstr(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), &wstr[0], size_needed);
+    return wstr;
+}
+
+std::string getAccessToken() {
+    // Bạn cần đăng ký app ở Azure AD và lấy token bằng client credentials hoặc device code flow
+    // Ở đây dùng token lấy thủ công từ https://developer.microsoft.com/graph/graph-explorer
+    // Hoặc dùng MSAL.cpp cho production
+    std::cout << "Dán access token từ Graph Explorer: ";
+    std::string token;
+    std::getline(std::cin, token);
+    return token;
+}
+
+int main() {
+    std::string token = getAccessToken();
+    if (token.empty()) return 1;
+
+    // Thay bằng site của bạn
+    std::string siteName = "yourcompany.sharepoint.com,site-guid-or-name"; // lấy từ Graph
+    std::string driveId = "b!xxxx"; // ID của Document Library (thường là Shared Documents)
+    std::string query = "hợp đồng"; // từ khóa tìm kiếm
+
+    // Graph API Search endpoint
+    std::string requestUrl = 
+        "https://graph.microsoft.com/v1.0/sites/" + siteName + 
+        "/drive/root/search(q='" + query + "')?$select=name,size,folder,webUrl";
+
+    DWORD dwSize = 0;
+    DWORD dwDownloaded = 0;
+    LPSTR pszOutBuffer;
+    BOOL bResults = FALSE;
+    HINTERNET hSession = NULL, hConnect = NULL, hRequest = NULL;
+
+    // Mở session
+    hSession = WinHttpOpen(L"SharePoint Search C++", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!hSession) goto Cleanup;
+
+    URL_COMPONENTS urlComp = { sizeof(urlComp) };
+    urlComp.dwSchemeLength = (DWORD)-1;
+    urlComp.dwHostNameLength = (DWORD)-1;
+    urlComp.dwUrlPathLength = (DWORD)-1;
+    if (!WinHttpCrackUrl(s2ws(requestUrl).c_str(), 0, 0, &urlComp)) goto Cleanup;
+
+    std::wstring host(urlComp.lpszHostName, urlComp.dwHostNameLength);
+    std::wstring path(urlComp.lpszUrlPath, urlComp.dwUrlPathLength);
+
+    hConnect = WinHttpConnect(hSession, host.c_str(), urlComp.nPort, 0);
+    if (!hConnect) goto Cleanup;
+
+    hRequest = WinHttpOpenRequest(hRequest, L"GET", path.c_str(), NULL, WINHTTP_NO_REQUEST_DATA, NULL, WINHTTP_FLAG_SECURE);
+    if (!hRequest) goto Cleanup;
+
+    // Header
+    std::wstring authHeader = L"Authorization: Bearer " + s2ws(token);
+    WinHttpAddRequestHeaders(hRequest, authHeader.c_str(), (ULONG)-1L, WINHTTP_ADDREQ_FLAG_ADD);
+
+    WinHttpAddRequestHeaders(hRequest, L"Accept: application/json", (ULONG)-1L, WINHTTP_ADDREQ_FLAG_ADD);
+
+    // Gửi request
+    bResults = WinHttpSendRequest(hRequest, NULL, 0, NULL, 0, 0, 0);
+    if (!bResults) goto Cleanup;
+
+    bResults = WinHttpReceiveResponse(hRequest, NULL);
+    if (!bResults) goto Cleanup;
+
+    // Đọc response
+    std::string response;
+    do {
+        dwSize = 0;
+        if (!WinHttpQueryDataAvailable(hRequest, &dwSize)) break;
+
+        pszOutBuffer = new char[dwSize + 1];
+        ZeroMemory(pszOutBuffer, dwSize + 1);
+
+        if (!WinHttpReadData(hRequest, (LPVOID)pszOutBuffer, dwSize, &dwDownloaded)) {
+            delete[] pszOutBuffer;
+            break;
+        }
+
+        response.append(pszOutBuffer, dwDownloaded);
+        delete[] pszOutBuffer;
+
+    } while (dwSize > 0);
+
+    // Parse JSON
+    Json::Value root;
+    Json::CharReaderBuilder builder;
+    std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    std::string errs;
+
+    if (reader->parse(response.c_str(), response.c_str() + response.size(), &root, &errs)) {
+        std::cout << "\nTim thay " << root["value"].size() << " ket qua:\n\n";
+        for (const auto& item : root["value"]) {
+            std::string name = item["name"].asString();
+            std::string webUrl = item["webUrl"].asString();
+            long long size = item["size"].asLargestInt();
+            std::cout << name << "  (" << size / 1024 << " KB)\n   -> " << webUrl << "\n\n";
+        }
+    } else {
+        std::cout << "Loi parse JSON: " << errs << std::endl;
+    }
+
+Cleanup:
+    if (hRequest) WinHttpCloseHandle(hRequest);
+    if (hConnect) WinHttpCloseHandle(hConnect);
+    if (hSession) WinHttpCloseHandle(hSession);
+
+    system("pause");
+    return 0;
+}
