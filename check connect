@@ -1,0 +1,8 @@
+from pymobiledevice3.cli.cli_common import run_cli
+from pymobiledevice3.lockdown import LockdownClient
+
+# Tự động lấy device đầu tiên kết nối
+lockdown = LockdownClient()
+print(f"Đã kết nối với: {lockdown.product_type} - {lockdown.product_version}")
+print(f"Tên máy: {lockdown.device_name}")
+print(f"UDID: {lockdown.udid}")
