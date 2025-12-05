@@ -1,0 +1,7 @@
+# Cài libimobiledevice mới nhất trước
+brew install libimobiledevice   # macOS
+# hoặc trên Ubuntu/Debian:
+sudo apt install libimobiledevice-dev usbmuxd python3-dev
+
+# Cài pymobiledevice3
+pip install -U pymobiledevice3
