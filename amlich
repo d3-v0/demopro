@@ -1,0 +1,12 @@
+from lunardate import LunarDate
+from datetime import datetime
+
+# Lấy ngày hiện tại
+now = datetime.now()
+
+# Chuyển đổi sang âm lịch
+lunar_date = LunarDate.fromSolarDate(now.year, now.month, now.day)
+
+print(f"Dương lịch: {now.strftime('%d/%m/%Y')}")
+print(f"Âm lịch: Ngày {lunar_date.day}, tháng {lunar_date.month}, năm {lunar_date.year}")
+print(f"Tháng nhuận: {'Có' if lunar_date.isLeapMonth else 'Không'}")
