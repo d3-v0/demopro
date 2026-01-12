@@ -1,0 +1,25 @@
+public class PoliceReportDisplay {
+    
+    public static void main(String[] args) {
+        // Thông tin từ thông báo công an
+        String incidentDateTime = "2026年1月10日 19时32分";
+        String location = "红谷滩区学府大道388号";
+        String policeStation = "南昌市公安局红谷滩分局";
+        String suspectName = "宋某雄";
+        String suspectGender = "男";
+        int suspectAge = 32;
+        String weapon = "陶瓷折叠水果刀";
+        String victim = "一名女子";
+        String injuryLevel = "表皮划伤";
+        String status = "嫌疑人已被当场控制";
+        String currentProgress = "案件正在进一步侦办中";
+        String reportDate = "2026年1月10日";
+
+        // Hiển thị đẹp mắt
+        System.out.println("═══════════════════════════════════════════════");
+        System.out.println("          警情通报 - 南昌市公安局红谷滩分局          ");
+        System.out.println("═══════════════════════════════════════════════\n");
+
+        System.out.printf("报警时间: %s%n", incidentDateTime);
+        System.out.printf("事发地点: %s%n", location);
+        System.out.println("案件性质: 故意
