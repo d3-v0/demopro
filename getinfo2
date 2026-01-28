@@ -1,0 +1,36 @@
+pip install user-agents
+# Ví dụ với Flask
+from flask import Flask, request
+from user_agents import parse
+
+app = Flask(__name__)
+
+@app.route('/')
+def show_device_info():
+    ua_string = request.headers.get('User-Agent', '')
+    if not ua_string:
+        return "Không tìm thấy User-Agent"
+
+    user_agent = parse(ua_string)
+
+    info = {
+        "Thiết bị là mobile?": user_agent.is_mobile,
+        "Thiết bị là tablet?": user_agent.is_tablet,
+        "Thiết bị là PC?": user_agent.is_pc,
+        "Thiết bị là bot?": user_agent.is_bot,
+        "Loại thiết bị": user_agent.device.family,          # ví dụ: iPhone, Galaxy S21, iPad...
+        "Hệ điều hành": f"{user_agent.os.family} {user_agent.os.version_string}",
+        "Trình duyệt": f"{user_agent.browser.family} {user_agent.browser.version_string}",
+        "User-Agent gốc": ua_string,
+    }
+
+    result = "<h2>Thông tin thiết bị truy cập website</h2>\n<pre>"
+    for k, v in info.items():
+        result += f"{k: <18}: {v}\n"
+    result += "</pre>"
+
+    return result
+
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5001)
