@@ -1,0 +1,20 @@
+import pandas as pd
+
+# 1. Đọc file Excel
+# Thay 'input.xlsx' bằng tên file của bạn
+df = pd.read_excel('input.xlsx')
+
+# Giả sử cột A có tên là 'Họ và Tên' hoặc bạn có thể dùng chỉ số cột
+# Nếu file không có tiêu đề, hãy thêm header=None vào read_excel
+column_name = 'Họ và Tên' 
+
+# 2. Danh sách các tên bạn muốn lọc
+names_to_filter = ['Nguyễn Văn A', 'Trần Thị B', 'Lê Văn C']
+
+# 3. Thực hiện lọc
+filtered_df = df[df[column_name].isin(names_to_filter)]
+
+# 4. Xuất ra file Excel mới
+filtered_df.to_excel('ket_qua_loc.xlsx', index=False)
+
+print("Đã lọc xong! Kiểm tra file ket_qua_loc.xlsx nhé.")
