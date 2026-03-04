@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+
+def nhap_ten():
+    name = input("Nhập tên của bạn: ")
+    print(f"Xin chào, {name}!\n")
+
+
+def nhap_tuoi():
+    try:
+        age = int(input("Nhập tuổi của bạn: "))
+        print(f"Bạn {age} tuổi.\n")
+    except ValueError:
+        print("❌ Tuổi phải là số nguyên!\n")
+
+
+def tinh_tong():
+    try:
+        a, b = map(float, input("Nhập 2 số cách nhau bởi dấu cách: ").split())
+        print(f"Tổng của {a} và {b} là: {a + b}\n")
+    except ValueError:
+        print("❌ Vui lòng nhập đúng 2 số!\n")
+
+
+def menu():
+    while True:
+        print("===== MENU =====")
+        print("1. Nhập tên")
+        print("2. Nhập tuổi")
+        print("3. Tính tổng 2 số")
+        print("4. Thoát")
+
+        choice = input("Chọn chức năng (1-4): ")
+
+        if choice == "1":
+            nhap_ten()
+        elif choice == "2":
+            nhap_tuoi()
+        elif choice == "3":
+            tinh_tong()
+        elif choice == "4":
+            print("Tạm biệt!")
+            break
+        else:
+            print("❌ Lựa chọn không hợp lệ!\n")
+
+
+if __name__ == "__main__":
+    menu()
