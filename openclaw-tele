@@ -1,0 +1,27 @@
+import os
+from dotenv import load_dotenv
+from upsonic import AutonomousAgent
+from upsonic.interfaces import InterfaceManager, TelegramInterface, InterfaceMode
+
+load_dotenv()
+
+# Tạo Autonomous Agent (giống OpenClaw)
+agent = AutonomousAgent(
+    model="openai/gpt-4o-mini",           # thay bằng "anthropic/claude-3-5-sonnet" hoặc "ollama/llama3.2" nếu dùng local
+    workspace=os.path.expanduser("~/my-openclaw-workspace"),
+    # Bạn có thể thêm temperature, max_tokens... nếu cần
+)
+
+# Kết nối với Telegram
+telegram = TelegramInterface(
+    agent=agent,
+    bot_token=os.getenv("TELEGRAM_BOT_TOKEN"),
+    webhook_url=os.getenv("TELEGRAM_WEBHOOK_URL"),
+    allowed_user_ids=[int(os.getenv("TELEGRAM_USER_ID"))],   # chỉ bạn được dùng
+    mode=InterfaceMode.CHAT,          # CHAT = nhớ lịch sử hội thoại
+    reset_command="/reset",           # gõ /reset để reset cuộc trò chuyện
+)
+
+# Khởi động server
+manager = InterfaceManager(interfaces=[telegram])
+manager.serve(host="0.0.0.0", port=8000)
