@@ -1,0 +1,11 @@
+import requests
+from bs4 import BeautifulSoup
+
+url = "https://example.com"
+
+response = requests.get(url)
+soup = BeautifulSoup(response.text, "html.parser")
+
+# Lấy tất cả tiêu đề h1
+for h1 in soup.find_all("h1"):
+    print(h1.text)
