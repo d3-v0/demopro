@@ -1,0 +1,21 @@
+# Tạo wrapper (chỉ chạy 1 lần)
+cat > run-retry.sh << 'EOF'
+#!/bin/bash
+LOGFILE="$HOME/oci-create.log"
+FLAG="$HOME/vm_created.flag"
+
+echo "$(date) - [WRAPPER] Started - PID $$" | tee -a "$LOGFILE"
+
+while [ ! -f "$FLAG" ]; do
+    echo "$(date) - [WRAPPER] Khởi chạy create-vm-retry.sh" | tee -a "$LOGFILE"
+    ./create-vm-retry.sh
+    
+    if [ -f "$FLAG" ]; then
+        echo "$(date) - [WRAPPER] VM đã tạo thành công!" | tee -a "$LOGFILE"
+        break
+    fi
+    sleep 10
+done
+EOF
+
+chmod +x run-retry.sh
