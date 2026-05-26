@@ -1,0 +1,27 @@
+import requests
+import json
+
+# Thay bằng URL của bạn
+POWER_AUTOMATE_URL = "https://prod-xxx.logic.azure.com:443/workflows/xxx/triggers/manual/paths/invoke?api-version=2016-06-01&sp=...&sv=1.0&sig=..."
+
+payload = {
+    "title": "Top 20 Nhà máy chế biến thủy hải sản",
+    "message": "Danh sách top 20 lớn nhất thế giới",
+    "data": [
+        {"rank": 1, "name": "Trident Seafoods Akutan", "capacity": "1360 tấn/ngày"},
+        {"rank": 2, "name": "Thai Union Samut Sakhon", "capacity": "Hàng trăm tấn tuna/ngày"},
+        # Thêm các nhà máy khác...
+    ]
+}
+
+headers = {
+    "Content-Type": "application/json"
+}
+
+response = requests.post(POWER_AUTOMATE_URL, headers=headers, json=payload)
+
+print("Status Code:", response.status_code)
+if response.status_code == 202:
+    print("Đã gửi thành công đến Power Automate!")
+else:
+    print("Lỗi:", response.text)
