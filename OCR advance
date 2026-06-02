@@ -1,0 +1,10 @@
+#include <opencv2/opencv.hpp>
+
+cv::Mat img = cv::imread("image.jpg");
+cv::Mat gray, binary;
+
+cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+cv::threshold(gray, binary, 0, 255,
+              cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+cv::imwrite("processed.png", binary);
