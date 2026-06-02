@@ -1,0 +1,39 @@
+#include <iostream>
+#include <tesseract/baseapi.h>
+#include <leptonica/allheaders.h>
+
+int main()
+{
+    // Đường dẫn ảnh
+    const char* imagePath = "image.jpg";
+
+    // Khởi tạo Tesseract
+    tesseract::TessBaseAPI ocr;
+    if (ocr.Init(NULL, "eng"))
+    {
+        std::cerr << "Khong the khoi tao Tesseract!" << std::endl;
+        return -1;
+    }
+
+    // Đọc ảnh
+    Pix* image = pixRead(imagePath);
+    if (!image)
+    {
+        std::cerr << "Khong mo duoc anh!" << std::endl;
+        return -1;
+    }
+
+    // OCR
+    ocr.SetImage(image);
+    char* text = ocr.GetUTF8Text();
+
+    std::cout << "Noi dung nhan dien:\n";
+    std::cout << text << std::endl;
+
+    // Giải phóng bộ nhớ
+    delete[] text;
+    pixDestroy(&image);
+    ocr.End();
+
+    return 0;
+}
