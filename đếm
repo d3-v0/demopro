@@ -1,0 +1,13 @@
+# Nhập số bắt đầu
+start = int(input("Nhập số bắt đầu đếm: "))
+
+print(f"Bắt đầu đếm từ {start}...")
+
+i = start
+while True:          # Vòng lặp vô hạn
+    print(i)
+    i += 1           # Tăng dần 1 đơn vị
+    
+    # Tùy chọn: thêm delay để dễ nhìn (bỏ comment nếu muốn)
+    # import time
+    # time.sleep(0.5)  # Dừng 0.5 giây
