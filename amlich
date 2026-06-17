@@ -1,7 +1,7 @@
 from lunardate import LunarDate
 from datetime import datetime
 
-# Lấy ngày hiện tại
+
 now = datetime.now()
 
 # Chuyển đổi sang âm lịch
