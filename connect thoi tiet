@@ -1,0 +1,32 @@
+import requests
+
+# Tọa độ Hà Nội
+LATITUDE = 21.0285
+LONGITUDE = 105.8542
+
+url = (
+    f"https://api.open-meteo.com/v1/forecast?"
+    f"latitude={LATITUDE}&longitude={LONGITUDE}"
+    f"&current=temperature_2m,relative_humidity_2m,"
+    f"apparent_temperature,wind_speed_10m,weather_code"
+)
+
+try:
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+
+    data = response.json()
+    current = data["current"]
+
+    print("=" * 40)
+    print("THỜI TIẾT HIỆN TẠI")
+    print("=" * 40)
+    print(f"Nhiệt độ: {current['temperature_2m']} °C")
+    print(f"Độ ẩm: {current['relative_humidity_2m']} %")
+    print(f"Nhiệt độ cảm nhận: {current['apparent_temperature']} °C")
+    print(f"Tốc độ gió: {current['wind_speed_10m']} km/h")
+    print(f"Mã thời tiết: {current['weather_code']}")
+    print("=" * 40)
+
+except requests.exceptions.RequestException as e:
+    print("Lỗi kết nối:", e)
