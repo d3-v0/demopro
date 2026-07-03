@@ -1,0 +1,31 @@
+import requests
+
+city = input("Nhập tên thành phố: ")
+
+geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1"
+
+geo = requests.get(geo_url).json()
+
+if "results" not in geo:
+    print("Không tìm thấy thành phố!")
+    exit()
+
+lat = geo["results"][0]["latitude"]
+lon = geo["results"][0]["longitude"]
+name = geo["results"][0]["name"]
+country = geo["results"][0]["country"]
+
+weather_url = (
+    f"https://api.open-meteo.com/v1/forecast?"
+    f"latitude={lat}&longitude={lon}"
+    f"&current=temperature_2m,wind_speed_10m,relative_humidity_2m"
+)
+
+weather = requests.get(weather_url).json()
+
+current = weather["current"]
+
+print(f"\nThời tiết tại {name}, {country}")
+print(f"Nhiệt độ: {current['temperature_2m']} °C")
+print(f"Độ ẩm: {current['relative_humidity_2m']} %")
+print(f"Gió: {current['wind_speed_10m']} km/h")
