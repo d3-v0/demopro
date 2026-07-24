@@ -1,0 +1,18 @@
+import subprocess
+
+cmd = [
+    "cscript",
+    "//Nologo",
+    r"C:\Windows\System32\slmgr.vbs",
+    "/dlv"
+]
+
+result = subprocess.run(
+    cmd,
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="ignore"
+)
+
+print(result.stdout)
