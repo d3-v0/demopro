@@ -1,0 +1,24 @@
+import wmi
+
+LICENSE_STATUS = {
+    0: "Unlicensed",
+    1: "Licensed",
+    2: "Out-Of-Box Grace",
+    3: "Out-Of-Tolerance Grace",
+    4: "Non-Genuine Grace",
+    5: "Notification",
+    6: "Extended Grace"
+}
+
+c = wmi.WMI()
+
+for lic in c.SoftwareLicensingProduct():
+    if lic.PartialProductKey:
+        print("=" * 60)
+        print("Name          :", lic.Name)
+        print("Description   :", lic.Description)
+        print("License Status:", LICENSE_STATUS.get(
+            lic.LicenseStatus, lic.LicenseStatus))
+        print("Partial Key   :", lic.PartialProductKey)
+        print("Product ID    :", lic.ProductKeyID)
+        print("License Family:", lic.LicenseFamily)
