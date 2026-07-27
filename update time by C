@@ -1,0 +1,197 @@
+/*
+ * ntp_sync.c - Simple NTP time synchronizer
+ * Compile: gcc -o ntp_sync ntp_sync.c
+ * Run (need root): sudo ./ntp_sync
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <errno.h>
+
+#define NTP_PORT        123
+#define NTP_PACKET_SIZE 48
+#define NTP_TIMESTAMP_DELTA 2208988800ull  // 1900 -> 1970
+
+// Public NTP servers (pool)
+const char *ntp_servers[] = {
+    "pool.ntp.org",
+    "time.google.com",
+    "time.cloudflare.com",
+    "time.windows.com",
+    "0.pool.ntp.org",
+    "1.pool.ntp.org",
+    NULL
+};
+
+typedef struct {
+    uint8_t li_vn_mode;      // Leap Indicator, Version, Mode
+    uint8_t stratum;
+    uint8_t poll;
+    uint8_t precision;
+    uint32_t root_delay;
+    uint32_t root_dispersion;
+    uint32_t ref_id;
+    uint32_t ref_ts_sec;
+    uint32_t ref_ts_frac;
+    uint32_t orig_ts_sec;
+    uint32_t orig_ts_frac;
+    uint32_t recv_ts_sec;
+    uint32_t recv_ts_frac;
+    uint32_t trans_ts_sec;
+    uint32_t trans_ts_frac;
+} ntp_packet;
+
+static uint32_t ntoh32(uint32_t net) {
+    return ntohl(net);
+}
+
+int query_ntp(const char *server, time_t *result_time) {
+    int sockfd;
+    struct sockaddr_in server_addr;
+    struct hostent *he;
+    ntp_packet packet;
+    ssize_t n;
+    struct timeval timeout = {5, 0}; // 5 seconds timeout
+
+    // Create UDP socket
+    sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sockfd < 0) {
+        perror("socket");
+        return -1;
+    }
+
+    // Set receive timeout
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+    // Resolve hostname
+    he = gethostbyname(server);
+    if (!he) {
+        fprintf(stderr, "Cannot resolve %s\n", server);
+        close(sockfd);
+        return -1;
+    }
+
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(NTP_PORT);
+    memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
+
+    // Prepare NTP request packet
+    memset(&packet, 0, sizeof(packet));
+    packet.li_vn_mode = (0 << 6) | (4 << 3) | 3; // LI=0, VN=4, Mode=3 (client)
+
+    // Send request
+    if (sendto(sockfd, &packet, sizeof(packet), 0,
+               (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("sendto");
+        close(sockfd);
+        return -1;
+    }
+
+    // Receive response
+    n = recvfrom(sockfd, &packet, sizeof(packet), 0, NULL, NULL);
+    close(sockfd);
+
+    if (n < (ssize_t)sizeof(packet)) {
+        fprintf(stderr, "Invalid/incomplete response from %s\n", server);
+        return -1;
+    }
+
+    // Extract transmit timestamp (seconds since 1900)
+    uint32_t tx_sec = ntoh32(packet.trans_ts_sec);
+
+    // Convert to Unix time (seconds since 1970)
+    *result_time = (time_t)(tx_sec - NTP_TIMESTAMP_DELTA);
+
+    return 0;
+}
+
+int set_system_time(time_t new_time) {
+    struct timeval tv;
+    tv.tv_sec = new_time;
+    tv.tv_usec = 0;
+
+    if (settimeofday(&tv, NULL) != 0) {
+        perror("settimeofday (need root privileges)");
+        return -1;
+    }
+    return 0;
+}
+
+void print_time(const char *label, time_t t) {
+    char buf[64];
+    struct tm *tm_info = localtime(&t);
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S %Z", tm_info);
+    printf("%s: %s\n", label, buf);
+}
+
+int main(int argc, char *argv[]) {
+    time_t ntp_time = 0;
+    time_t local_time;
+    int success = 0;
+    int i;
+
+    printf("=== NTP Time Synchronizer ===\n\n");
+
+    // Show current local time
+    time(&local_time);
+    print_time("Current local time", local_time);
+
+    // Try each NTP server until success
+    for (i = 0; ntp_servers[i] != NULL; i++) {
+        printf("Querying %s ... ", ntp_servers[i]);
+        fflush(stdout);
+
+        if (query_ntp(ntp_servers[i], &ntp_time) == 0) {
+            printf("OK\n");
+            success = 1;
+            break;
+        } else {
+            printf("FAILED\n");
+        }
+    }
+
+    if (!success) {
+        fprintf(stderr, "\nAll NTP servers failed.\n");
+        return 1;
+    }
+
+    print_time("NTP server time  ", ntp_time);
+
+    double diff = difftime(ntp_time, local_time);
+    printf("Difference        : %.0f seconds\n\n", diff);
+
+    // Ask user or force update
+    int do_update = 1;
+    if (argc > 1 && strcmp(argv[1], "--check") == 0) {
+        do_update = 0;
+        printf("Check-only mode (no time change).\n");
+    }
+
+    if (do_update) {
+        if (geteuid() != 0) {
+            fprintf(stderr, "Error: Need root privileges to set system time.\n");
+            fprintf(stderr, "Run with: sudo %s\n", argv[0]);
+            return 1;
+        }
+
+        printf("Updating system time...\n");
+        if (set_system_time(ntp_time) == 0) {
+            time(&local_time);
+            print_time("New system time  ", local_time);
+            printf("\nTime synchronized successfully.\n");
+        } else {
+            return 1;
+        }
+    }
+
+    return 0;
+}
