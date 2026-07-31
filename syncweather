@@ -1,0 +1,58 @@
+import requests
+from datetime import datetime
+
+# ==========================
+# CẤU HÌNH
+# ==========================
+
+# Ví dụ: Hà Nội
+LATITUDE = 21.0285
+LONGITUDE = 105.8542
+
+URL = (
+    "https://api.open-meteo.com/v1/forecast"
+    f"?latitude={LATITUDE}"
+    f"&longitude={LONGITUDE}"
+    "&current=rain,precipitation,weather_code"
+    "&hourly=precipitation_probability,rain"
+    "&forecast_days=1"
+    "&timezone=auto"
+)
+
+# ==========================
+# LẤY DỮ LIỆU
+# ==========================
+
+response = requests.get(URL, timeout=10)
+response.raise_for_status()
+
+data = response.json()
+
+current = data["current"]
+
+rain = current.get("rain", 0)
+precipitation = current.get("precipitation", 0)
+weather_code = current.get("weather_code")
+
+print("=" * 50)
+print("Thời gian :", current["time"])
+print("Weather Code :", weather_code)
+print("Lượng mưa :", rain, "mm")
+print("Giáng thủy :", precipitation, "mm")
+
+if rain > 0:
+    print(">>> ĐANG MƯA")
+else:
+    print(">>> KHÔNG MƯA")
+
+print("\nDự báo 12 giờ tới:")
+
+times = data["hourly"]["time"]
+prob = data["hourly"]["precipitation_probability"]
+rain_hour = data["hourly"]["rain"]
+
+for t, p, r in zip(times[:12], prob[:12], rain_hour[:12]):
+    print(
+        f"{t} | Khả năng mưa: {p:>3}% | "
+        f"Lượng mưa: {r:.1f} mm"
+    )
