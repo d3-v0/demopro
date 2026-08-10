@@ -1,0 +1,108 @@
+import subprocess
+import time
+import sys
+
+def run_adb(command):
+    """Chạy lệnh ADB và trả về kết quả"""
+    try:
+        result = subprocess.run(
+            ["adb"] + command,
+            capture_output=True,
+            text=True,
+            timeout=15
+        )
+        return result.stdout.strip(), result.stderr.strip(), result.returncode
+    except FileNotFoundError:
+        print("Lỗi: Không tìm thấy lệnh 'adb'. Hãy cài đặt Android Platform Tools.")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        return "", "Timeout", 1
+
+def check_adb_server():
+    """Khởi động ADB server nếu cần"""
+    print("Đang khởi động ADB server...")
+    run_adb(["start-server"])
+    time.sleep(1)
+
+def list_devices():
+    """Liệt kê các thiết bị Android đang kết nối"""
+    stdout, stderr, code = run_adb(["devices", "-l"])
+    if code != 0:
+        print("Lỗi khi lấy danh sách thiết bị:", stderr)
+        return []
+
+    lines = stdout.splitlines()
+    devices = []
+    
+    for line in lines[1:]:  # Bỏ dòng đầu "List of devices attached"
+        if line.strip() and "device" in line:
+            parts = line.split()
+            serial = parts[0]
+            info = " ".join(parts[1:])
+            devices.append({"serial": serial, "info": info})
+    
+    return devices
+
+def connect_usb():
+    """Kết nối và kiểm tra thiết bị USB"""
+    check_adb_server()
+    
+    print("Đang tìm thiết bị Android qua USB...")
+    devices = list_devices()
+    
+    if not devices:
+        print("\nKhông tìm thấy thiết bị nào.")
+        print("Hãy kiểm tra:")
+        print("  1. Đã bật USB Debugging chưa?")
+        print("  2. Đã cho phép máy tính này chưa? (xem trên màn hình điện thoại)")
+        print("  3. Cáp USB có hỗ trợ truyền dữ liệu không?")
+        print("  4. Thử rút ra cắm lại cáp.")
+        return None
+    
+    print(f"\nTìm thấy {len(devices)} thiết bị:")
+    for i, dev in enumerate(devices, 1):
+        print(f"  {i}. Serial: {dev['serial']} | {dev['info']}")
+    
+    # Lấy thiết bị đầu tiên
+    device = devices[0]
+    serial = device["serial"]
+    
+    # Kiểm tra kết nối
+    stdout, _, _ = run_adb(["-s", serial, "shell", "echo", "OK"])
+    if "OK" in stdout:
+        print(f"\nKết nối thành công với thiết bị: {serial}")
+        return serial
+    else:
+        print("Kết nối thất bại.")
+        return None
+
+def get_device_info(serial):
+    """Lấy thông tin cơ bản của thiết bị"""
+    print("\n--- Thông tin thiết bị ---")
+    
+    commands = {
+        "Model": ["shell", "getprop", "ro.product.model"],
+        "Manufacturer": ["shell", "getprop", "ro.product.manufacturer"],
+        "Android Version": ["shell", "getprop", "ro.build.version.release"],
+        "SDK": ["shell", "getprop", "ro.build.version.sdk"],
+        "Serial": ["shell", "getprop", "ro.serialno"],
+    }
+    
+    for name, cmd in commands.items():
+        stdout, _, _ = run_adb(["-s", serial] + cmd)
+        print(f"{name:18}: {stdout or 'N/A'}")
+
+def main():
+    serial = connect_usb()
+    
+    if serial:
+        get_device_info(serial)
+        
+        # Ví dụ: Chạy một lệnh shell
+        print("\n--- Ví dụ chạy lệnh shell ---")
+        stdout, _, _ = run_adb(["-s", serial, "shell", "pm", "list", "packages", "-3"])
+        print("Các ứng dụng đã cài (user):")
+        print(stdout[:500] + "..." if len(stdout) > 500 else stdout)
+
+if __name__ == "__main__":
+    main()
