@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kiểm tra chất lượng màn hình</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #111;
+      color: #eee;
+      user-select: none;
+    }
+
+    #screen {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Overlay hướng dẫn */
+    #hud {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      z-index: 100;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 14px 18px;
+      max-width: 420px;
+      font-size: 13px;
+      line-height: 1.5;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    #hud h1 {
+      font-size: 15px;
+      margin-bottom: 6px;
+      color: #4fc3f7;
+    }
+    #hud kbd {
+      display: inline-block;
+      background: #333;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 12px;
+      margin: 0 2px;
+    }
+    #hud .test-name {
+      color: #81c784;
+      font-weight: 600;
+    }
+
+    /* Menu chọn test */
+    #menu {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: #0d1117;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px;
+      overflow-y: auto;
+    }
+    #menu h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      background: linear-gradient(90deg, #4fc3f7, #81c784);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    #menu p {
+      color: #8b949e;
+      margin-bottom: 20px;
+      text-align: center;
+      max-width: 520px;
+    }
+    .btn-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      width: 100%;
+      max-width: 700px;
+    }
+    .btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+      padding: 14px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .btn:hover {
+      background: #30363d;
+      border-color: #4fc3f7;
+      transform: translateY(-1px);
+    }
+    .btn strong { display: block; margin-bottom: 2px; }
+    .btn span { font-size: 12px; color: #8b949e; }
+    .hint {
+      margin-top: 24px;
+      color: #6e7681;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    /* Text test */
+    .sharpness {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 40px;
+      background: #fff;
+      color: #000;
+    }
+    .sharpness h2 { font-size: 32px; }
+    .sharpness p { font-size: 14px; max-width: 800px; text-align: center; line-height: 1.6; }
+    .sharpness .small { font-size: 11px; }
+    .sharpness .tiny { font-size: 9px; letter-spacing: 0.5px; }
+
+    /* Checker / grid */
+    .checker {
+      width: 100%;
+      height: 100%;
+      background-image:
+        linear-gradient(45deg, #000 25%, transparent 25%),
+        linear-gradient(-45deg, #000 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #000 75%),
+        linear-gradient(-45deg, transparent 75%, #000 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    }
+    .grid-lines {
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+      background-image:
+        linear-gradient(#0f0 1px, transparent 1px),
+        linear-gradient(90deg, #0f0 1px, transparent 1px);
+      background-size: 50px 50px;
+    }
+
+    /* Moving bar for ghosting */
+    #ghost-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 40px;
+      height: 100%;
+      background: #fff;
+      will-change: transform;
+    }
+  </style>
+</head>
+<body>
+  <!-- Menu chính -->
+  <div id="menu">
+    <h1>🖥️ Kiểm tra chất lượng màn hình</h1>
+    <p>
+      Công cụ kiểm tra điểm chết (dead pixel), màu sắc, độ đồng đều sáng,
+      độ nét và hiện tượng ghosting. Nhấn phím số hoặc click để bắt đầu.
+    </p>
+
+    <div class="btn-grid">
+      <button class="btn" data-test="black">
+        <strong>1. Màn hình đen</strong>
+        <span>Tìm điểm sáng / dead pixel sáng</span>
+      </button>
+      <button class="btn" data-test="white">
+        <strong>2. Màn hình trắng</strong>
+        <span>Tìm điểm tối / dead pixel tối</span>
+      </button>
+      <button class="btn" data-test="red">
+        <strong>3. Đỏ thuần</strong>
+        <span>Kiểm tra subpixel đỏ</span>
+      </button>
+      <button class="btn" data-test="green">
+        <strong>4. Xanh lá thuần</strong>
+        <span>Kiểm tra subpixel xanh lá</span>
+      </button>
+      <button class="btn" data-test="blue">
+        <strong>5. Xanh dương thuần</strong>
+        <span>Kiểm tra subpixel xanh dương</span>
+      </button>
+      <button class="btn" data-test="gradient-h">
+        <strong>6. Gradient ngang</strong>
+        <span>Độ đồng đều sáng & banding</span>
+      </button>
+      <button class="btn" data-test="gradient-v">
+        <strong>7. Gradient dọc</strong>
+        <span>Độ đồng đều sáng & banding</span>
+      </button>
+      <button class="btn" data-test="checker">
+        <strong>8. Caro (Checkerboard)</strong>
+        <span>Độ nét & pixel hoàn hảo</span>
+      </button>
+      <button class="btn" data-test="grid">
+        <strong>9. Lưới xanh</strong>
+        <span>Kiểm tra méo hình / convergence</span>
+      </button>
+      <button class="btn" data-test="sharpness">
+        <strong>0. Độ nét chữ</strong>
+        <span>Text rendering & clear type</span>
+      </button>
+      <button class="btn" data-test="ghost">
+        <strong>G. Ghosting / Motion</strong>
+        <span>Vệt sáng khi chuyển động</span>
+      </button>
+      <button class="btn" data-test="cycle">
+        <strong>C. Chạy tự động</strong>
+        <span>Lần lượt tất cả màu cơ bản</span>
+      </button>
+    </div>
+
+    <div class="hint">
+      Trong lúc test: <kbd>←</kbd> <kbd>→</kbd> hoặc <kbd>Space</kbd> chuyển test ·
+      <kbd>F</kbd> toàn màn hình · <kbd>Esc</kbd> / <kbd>M</kbd> về menu ·
+      <kbd>H</kbd> ẩn/hiện hướng dẫn
+    </div>
+  </div>
+
+  <!-- Vùng hiển thị test -->
+  <div id="screen" style="display:none;"></div>
+
+  <!-- HUD -->
+  <div id="hud" style="display:none;">
+    <h1>Kiểm tra màn hình</h1>
+    <div>Đang chạy: <span class="test-name" id="testName">—</span></div>
+    <div style="margin-top:6px;">
+      <kbd>←</kbd><kbd>→</kbd> / <kbd>Space</kbd> đổi test ·
+      <kbd>F</kbd> fullscreen · <kbd>Esc</kbd> menu · <kbd>H</kbd> ẩn HUD
+    </div>
+  </div>
+
+  <script>
+    const TESTS = [
+      { id: "black", name: "Màn hình đen", desc: "Tìm điểm sáng (stuck/dead pixel)" },
+      { id: "white", name: "Màn hình trắng", desc: "Tìm điểm tối" },
+      { id: "red", name: "Đỏ thuần (#FF0000)", desc: "Subpixel đỏ" },
+      { id: "green", name: "Xanh lá thuần (#00FF00)", desc: "Subpixel xanh lá" },
+      { id: "blue", name: "Xanh dương thuần (#0000FF)", desc: "Subpixel xanh dương" },
+      { id: "gradient-h", name: "Gradient ngang", desc: "Đồng đều sáng & banding" },
+      { id: "gradient-v", name: "Gradient dọc", desc: "Đồng đều sáng & banding" },
+      { id: "checker", name: "Caro 10px", desc: "Độ nét pixel" },
+      { id: "grid", name: "Lưới xanh", desc: "Méo hình / geometry" },
+      { id: "sharpness", name: "Độ nét chữ", desc: "ClearType / text" },
+      { id: "ghost", name: "Ghosting test", desc: "Vệt chuyển động" },
+    ];
+
+    let currentIndex = 0;
+    let cycling = false;
+    let cycleTimer = null;
+    let ghostAnim = null;
+    let hudVisible = true;
+
+    const menu = document.getElementById("menu");
+    const screen = document.getElementById("screen");
+    const hud = document.getElementById("hud");
+    const testNameEl = document.getElementById("testName");
+
+    // Gắn sự kiện nút menu
+    document.querySelectorAll(".btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.test;
+        if (id === "cycle") {
+          startCycle();
+        } else {
+          const idx = TESTS.findIndex(t => t.id === id);
+          if (idx >= 0) startTest(idx);
+        }
+      });
+    });
+
+    function startTest(index) {
+      stopCycle();
+      currentIndex = index;
+      menu.style.display = "none";
+      screen.style.display = "block";
+      hud.style.display = hudVisible ? "block" : "none";
+      renderTest(TESTS[currentIndex]);
+    }
+
+    function backToMenu() {
+      stopCycle();
+      stopGhost();
+      screen.style.display = "none";
+      menu.style.display = "flex";
+      hud.style.display = "none";
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    function nextTest(dir = 1) {
+      stopGhost();
+      currentIndex = (currentIndex + dir + TESTS.length) % TESTS.length;
+      renderTest(TESTS[currentIndex]);
+    }
+
+    function renderTest(test) {
+      stopGhost();
+      testNameEl.textContent = test.name + " — " + test.desc;
+      screen.innerHTML = "";
+      screen.style.background = "";
+      screen.className = "";
+
+      switch (test.id) {
+        case "black":
+          screen.style.background = "#000";
+          break;
+        case "white":
+          screen.style.background = "#fff";
+          break;
+        case "red":
+          screen.style.background = "#f00";
+          break;
+        case "green":
+          screen.style.background = "#0f0";
+          break;
+        case "blue":
+          screen.style.background = "#00f";
+          break;
+        case "gradient-h":
+          screen.style.background = "linear-gradient(to right, #000, #fff)";
+          break;
+        case "gradient-v":
+          screen.style.background = "linear-gradient(to bottom, #000, #fff)";
+          break;
+        case "checker": {
+          const d = document.createElement("div");
+          d.className = "checker";
+          screen.appendChild(d);
+          break;
+        }
+        case "grid": {
+          const d = document.createElement("div");
+          d.className = "grid-lines";
+          screen.appendChild(d);
+          break;
+        }
+        case "sharpness": {
+          const d = document.createElement("div");
+          d.className = "sharpness";
+          d.innerHTML = `
+            <h2>Kiểm tra độ nét chữ</h2>
+            <p>
+              The quick brown fox jumps over the lazy dog.<br>
+              0123456789 — ABCDEFGHIJKLMNOPQRSTUVWXYZ<br>
+              áàảãạăắằẳẵặâấầẩẫậ éèẻẽẹêếềểễệ íìỉĩị óòỏõọôốồổỗộơớờởỡợ úùủũụưứừửữự ýỳỷỹỵ đ
+            </p>
+            <p class="small">
+              Hãy nhìn sát màn hình: chữ có bị lem, có màu sắc lạ ở cạnh không?
+              ClearType (Windows) hoặc font smoothing (macOS) ảnh hưởng kết quả.
+            </p>
+            <p class="tiny">
+              9px: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.
+              The five boxing wizards jump quickly. Pack my box with five dozen liquor jugs.
+            </p>
+          `;
+          screen.appendChild(d);
+          break;
+        }
+        case "ghost":
+          startGhost();
+          break;
+      }
+    }
+
+    function startGhost() {
+      screen.style.background = "#000";
+      const bar = document.createElement("div");
+      bar.id = "ghost-bar";
+      screen.appendChild(bar);
+
+      let x = 0;
+      let dir = 1;
+      const speed = 8; // px per frame
+
+      function animate() {
+        x += speed * dir;
+        if (x > window.innerWidth - 40) dir = -1;
+        if (x < 0) dir = 1;
+        bar.style.transform = `translateX(${x}px)`;
+        ghostAnim = requestAnimationFrame(animate);
+      }
+      ghostAnim = requestAnimationFrame(animate);
+    }
+
+    function stopGhost() {
+      if (ghostAnim) {
+        cancelAnimationFrame(ghostAnim);
+        ghostAnim = null;
+      }
+    }
+
+    function startCycle() {
+      cycling = true;
+      currentIndex = 0;
+      menu.style.display = "none";
+      screen.style.display = "block";
+      hud.style.display = hudVisible ? "block" : "none";
+      renderTest(TESTS[0]);
+
+      cycleTimer = setInterval(() => {
+        currentIndex = (currentIndex + 1) % 5; // chỉ cycle 5 màu cơ bản
+        renderTest(TESTS[currentIndex]);
+      }, 2500);
+    }
+
+    function stopCycle() {
+      cycling = false;
+      if (cycleTimer) {
+        clearInterval(cycleTimer);
+        cycleTimer = null;
+      }
+    }
+
+    // Phím tắt
+    document.addEventListener("keydown", (e) => {
+      if (menu.style.display !== "none") {
+        // Trong menu
+        const map = {
+          "1": 0, "2": 1, "3": 2, "4": 3, "5": 4,
+          "6": 5, "7": 6, "8": 7, "9": 8, "0": 9,
+          "g": 10, "G": 10
+        };
+        if (map[e.key] !== undefined) {
+          startTest(map[e.key]);
+        } else if (e.key === "c" || e.key === "C") {
+          startCycle();
+        }
+        return;
+      }
+
+      // Đang test
+      switch (e.key) {
+        case "Escape":
+        case "m":
+        case "M":
+          backToMenu();
+          break;
+        case "ArrowRight":
+        case " ":
+        case "n":
+        case "N":
+          e.preventDefault();
+          nextTest(1);
+          break;
+        case "ArrowLeft":
+        case "p":
+        case "P":
+          e.preventDefault();
+          nextTest(-1);
+          break;
+        case "f":
+        case "F":
+          toggleFullscreen();
+          break;
+        case "h":
+        case "H":
+          hudVisible = !hudVisible;
+          hud.style.display = hudVisible ? "block" : "none";
+          break;
+      }
+    });
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    // Click vào màn hình cũng chuyển test tiếp
+    screen.addEventListener("click", () => {
+      if (!cycling) nextTest(1);
+    });
+  </script>
+</body>
+</html>
