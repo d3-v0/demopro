@@ -1,0 +1,354 @@
+#!/usr/bin/env python3
+"""
+hardware_info.py
+Nhận diện phần cứng máy tính trên Linux (Ubuntu/Debian và các distro tương tự).
+
+Hiển thị:
+- CPU: model, số core/thread, kiến trúc, xung
+- RAM: tổng/dùng/còn trống
+- GPU: tên GPU và driver nếu có
+- Mainboard: manufacturer/model
+- BIOS/UEFI
+- Disk: thiết bị, model, dung lượng, loại SSD/HDD nếu xác định được
+- Network: interface, MAC, IP
+- OS và kernel
+- Máy/hostname
+"""
+
+import json
+import os
+import platform
+import re
+import shutil
+import socket
+import subprocess
+from pathlib import Path
+
+
+def run(cmd):
+    try:
+        p = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=5, check=False
+        )
+        return p.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return ""
+
+
+def read_file(path):
+    try:
+        return Path(path).read_text(errors="replace").strip()
+    except (OSError, PermissionError):
+        return ""
+
+
+def human_size(value):
+    try:
+        value = float(value)
+    except (ValueError, TypeError):
+        return str(value)
+
+    units = ["B", "KB", "MB", "GB", "TB", "PB"]
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            return f"{value:.1f} {unit}"
+        value /= 1024
+
+
+def get_cpu():
+    info = {}
+    cpuinfo = read_file("/proc/cpuinfo")
+
+    model = re.search(r"^model name\s*:\s*(.+)$", cpuinfo, re.M)
+    if not model:
+        model = re.search(r"^Hardware\s*:\s*(.+)$", cpuinfo, re.M)
+
+    info["model"] = model.group(1).strip() if model else platform.processor()
+    info["architecture"] = platform.machine()
+    info["logical_threads"] = os.cpu_count()
+
+    physical = run(["lscpu", "-p=CPU,Core,Socket"])
+    if physical:
+        rows = [
+            line for line in physical.splitlines()
+            if line and not line.startswith("#")
+        ]
+        cores = {(x.split(",")[1], x.split(",")[2]) for x in rows if len(x.split(",")) >= 3}
+        info["physical_cores"] = len(cores) if cores else "Unknown"
+
+    lscpu = run(["lscpu"])
+    mhz = re.search(r"CPU max MHz:\s*([\d.]+)", lscpu)
+    if not mhz:
+        mhz = re.search(r"CPU MHz:\s*([\d.]+)", lscpu)
+    info["max_mhz"] = float(mhz.group(1)) if mhz else None
+
+    return info
+
+
+def get_memory():
+    data = {}
+    meminfo = read_file("/proc/meminfo")
+
+    values = {}
+    for line in meminfo.splitlines():
+        m = re.match(r"(\w+):\s+(\d+)\s+kB", line)
+        if m:
+            values[m.group(1)] = int(m.group(2)) * 1024
+
+    total = values.get("MemTotal", 0)
+    available = values.get("MemAvailable", 0)
+
+    data["total"] = human_size(total)
+    data["available"] = human_size(available)
+    data["used"] = human_size(max(total - available, 0))
+
+    return data
+
+
+def get_gpu():
+    result = []
+
+    lspci = shutil.which("lspci")
+    if lspci:
+        output = run(["lspci", "-nnk"])
+        current = None
+
+        for line in output.splitlines():
+            if re.search(r"VGA compatible controller|3D controller|Display controller", line, re.I):
+                current = {"device": line.strip()}
+                result.append(current)
+            elif current and "Kernel driver in use:" in line:
+                current["driver"] = line.split(":", 1)[1].strip()
+            elif current and "Kernel modules:" in line:
+                current["kernel_modules"] = line.split(":", 1)[1].strip()
+
+    if not result:
+        output = run(["lshw", "-C", "display"])
+        if output:
+            result.append({"device": output})
+
+    return result
+
+
+def get_board():
+    return {
+        "manufacturer": read_file("/sys/devices/virtual/dmi/id/board_vendor"),
+        "model": read_file("/sys/devices/virtual/dmi/id/board_name"),
+        "version": read_file("/sys/devices/virtual/dmi/id/board_version"),
+    }
+
+
+def get_bios():
+    return {
+        "vendor": read_file("/sys/devices/virtual/dmi/id/bios_vendor"),
+        "version": read_file("/sys/devices/virtual/dmi/id/bios_version"),
+        "date": read_file("/sys/devices/virtual/dmi/id/bios_date"),
+    }
+
+
+def get_disks():
+    disks = []
+    lsblk = shutil.which("lsblk")
+
+    if not lsblk:
+        return disks
+
+    output = run([
+        "lsblk", "-J", "-o",
+        "NAME,PATH,TYPE,SIZE,MODEL,TRAN,ROTA,FSTYPE"
+    ])
+
+    if not output:
+        return disks
+
+    try:
+        data = json.loads(output)
+    except json.JSONDecodeError:
+        return disks
+
+    for item in data.get("blockdevices", []):
+        if item.get("type") != "disk":
+            continue
+
+        rota = item.get("rota")
+        if rota is True:
+            media = "HDD"
+        elif rota is False:
+            media = "SSD/NVMe"
+        else:
+            media = "Unknown"
+
+        disks.append({
+            "name": item.get("name"),
+            "path": item.get("path"),
+            "model": (item.get("model") or "").strip(),
+            "size": item.get("size"),
+            "transport": item.get("tran"),
+            "media": media,
+        })
+
+    return disks
+
+
+def get_network():
+    result = []
+
+    for interface in sorted(os.listdir("/sys/class/net")):
+        if interface == "lo":
+            continue
+
+        mac = read_file(f"/sys/class/net/{interface}/address")
+        state = read_file(f"/sys/class/net/{interface}/operstate")
+
+        ips = []
+        ip_cmd = shutil.which("ip")
+        if ip_cmd:
+            output = run(["ip", "-o", "addr", "show", "dev", interface])
+            for line in output.splitlines():
+                parts = line.split()
+                if "inet" in parts:
+                    i = parts.index("inet")
+                    if i + 1 < len(parts):
+                        ips.append(parts[i + 1].split("/")[0])
+                if "inet6" in parts:
+                    i = parts.index("inet6")
+                    if i + 1 < len(parts):
+                        ips.append(parts[i + 1].split("/")[0])
+
+        result.append({
+            "interface": interface,
+            "state": state,
+            "mac": mac,
+            "ip": ips,
+        })
+
+    return result
+
+
+def collect_hardware():
+    return {
+        "system": {
+            "hostname": socket.gethostname(),
+            "os": platform.platform(),
+            "kernel": platform.release(),
+            "architecture": platform.machine(),
+        },
+        "cpu": get_cpu(),
+        "memory": get_memory(),
+        "gpu": get_gpu(),
+        "motherboard": get_board(),
+        "bios": get_bios(),
+        "disks": get_disks(),
+        "network": get_network(),
+    }
+
+
+def print_report(data):
+    print("=" * 72)
+    print("THÔNG TIN PHẦN CỨNG MÁY TÍNH")
+    print("=" * 72)
+
+    s = data["system"]
+    print("\n[HỆ THỐNG]")
+    print(f"Hostname      : {s['hostname']}")
+    print(f"OS            : {s['os']}")
+    print(f"Kernel        : {s['kernel']}")
+    print(f"Architecture  : {s['architecture']}")
+
+    c = data["cpu"]
+    print("\n[CPU]")
+    print(f"Model         : {c.get('model') or 'Unknown'}")
+    print(f"Architecture  : {c.get('architecture') or 'Unknown'}")
+    print(f"Physical cores: {c.get('physical_cores', 'Unknown')}")
+    print(f"Logical CPUs  : {c.get('logical_threads', 'Unknown')}")
+    if c.get("max_mhz"):
+        print(f"Max frequency : {c['max_mhz']:.0f} MHz")
+
+    m = data["memory"]
+    print("\n[RAM]")
+    print(f"Total         : {m['total']}")
+    print(f"Used          : {m['used']}")
+    print(f"Available     : {m['available']}")
+
+    print("\n[GPU]")
+    if data["gpu"]:
+        for i, gpu in enumerate(data["gpu"], 1):
+            print(f"GPU {i}         : {gpu.get('device', 'Unknown')}")
+            if gpu.get("driver"):
+                print(f"Driver        : {gpu['driver']}")
+            if gpu.get("kernel_modules"):
+                print(f"Modules       : {gpu['kernel_modules']}")
+    else:
+        print("Không tìm thấy GPU bằng các công cụ hiện có.")
+
+    b = data["motherboard"]
+    print("\n[MAINBOARD]")
+    print(f"Manufacturer  : {b.get('manufacturer') or 'Unknown'}")
+    print(f"Model         : {b.get('model') or 'Unknown'}")
+    print(f"Version       : {b.get('version') or 'Unknown'}")
+
+    bios = data["bios"]
+    print("\n[BIOS / UEFI]")
+    print(f"Vendor        : {bios.get('vendor') or 'Unknown'}")
+    print(f"Version       : {bios.get('version') or 'Unknown'}")
+    print(f"Date          : {bios.get('date') or 'Unknown'}")
+
+    print("\n[STORAGE]")
+    if data["disks"]:
+        for disk in data["disks"]:
+            print(
+                f"{disk.get('name', ''):<10} "
+                f"{disk.get('size', ''):<10} "
+                f"{disk.get('media', ''):<10} "
+                f"{disk.get('transport') or '':<7} "
+                f"{disk.get('model') or 'Unknown'}"
+            )
+    else:
+        print("Không đọc được danh sách ổ đĩa.")
+
+    print("\n[NETWORK]")
+    for net in data["network"]:
+        ips = ", ".join(net["ip"]) if net["ip"] else "No IP"
+        print(
+            f"{net['interface']:<12} "
+            f"{net['state']:<8} "
+            f"MAC: {net['mac']:<18} "
+            f"IP: {ips}"
+        )
+
+    print("\n" + "=" * 72)
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Nhận diện phần cứng máy tính trên Linux"
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Xuất dữ liệu dưới dạng JSON"
+    )
+    parser.add_argument(
+        "--save",
+        metavar="FILE",
+        help="Lưu kết quả JSON vào file"
+    )
+    args = parser.parse_args()
+
+    data = collect_hardware()
+
+    if args.save:
+        with open(args.save, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"Đã lưu: {args.save}")
+
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print_report(data)
+
+
+if __name__ == "__main__":
+    main()
