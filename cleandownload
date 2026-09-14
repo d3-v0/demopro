@@ -1,0 +1,56 @@
+import os
+import shutil
+
+# 1. Thay đổi đường dẫn này thành thư mục Downloads trên máy của bạn
+# Ví dụ Windows: r"C:\Users\Ten_Nguoi_Dung\Downloads"
+# Ví dụ Mac/Linux: "/Users/Ten_Nguoi_Dung/Downloads"
+thu_muc_nguon = r"C:\Users\Ten_Nguoi_Dung\Downloads"
+
+# 2. Định nghĩa các thư mục và định dạng file tương ứng
+phan_loai = {
+    "Hình ảnh": [".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp"],
+    "Tài liệu": [".pdf", ".doc", ".docx", ".txt", ".xlsx", ".csv", ".pptx"],
+    "Video": [".mp4", ".mkv", ".mov", ".avi"],
+    "Âm thanh": [".mp3", ".wav", ".flac"],
+    "Phần mềm": [".exe", ".msi", ".dmg", ".pkg"],
+    "File Nén": [".zip", ".rar", ".7z", ".tar", ".gz"]
+}
+
+def don_dep_thu_muc():
+    # Quét tất cả các file trong thư mục
+    for ten_file in os.listdir(thu_muc_nguon):
+        duong_dan_file = os.path.join(thu_muc_nguon, ten_file)
+
+        # Bỏ qua các thư mục có sẵn, chỉ xử lý file lẻ
+        if os.path.isfile(duong_dan_file):
+            _, duoi_file = os.path.splitext(ten_file)
+            duoi_file = duoi_file.lower()
+            da_chuyen = False
+
+            # Kiểm tra đuôi file thuộc nhóm nào
+            for ten_thu_muc, danh_sach_duoi in phan_loai.items():
+                if duoi_file in danh_sach_duoi:
+                    thu_muc_dich = os.path.join(thu_muc_nguon, ten_thu_muc)
+
+                    # Tạo thư mục phân loại nếu nó chưa tồn tại
+                    if not os.path.exists(thu_muc_dich):
+                        os.makedirs(thu_muc_dich)
+
+                    # Di chuyển file vào đúng nhà của nó
+                    shutil.move(duong_dan_file, os.path.join(thu_muc_dich, ten_file))
+                    print(f"Đã chuyển: {ten_file} -> {ten_thu_muc}")
+                    da_chuyen = True
+                    break
+            
+            # Gom các định dạng lạ vào thư mục "Khác"
+            if not da_chuyen:
+                thu_muc_khac = os.path.join(thu_muc_nguon, "Khác")
+                if not os.path.exists(thu_muc_khac):
+                    os.makedirs(thu_muc_khac)
+                shutil.move(duong_dan_file, os.path.join(thu_muc_khac, ten_file))
+                print(f"Đã chuyển: {ten_file} -> Khác")
+
+if __name__ == "__main__":
+    print("Bắt đầu dọn dẹp...")
+    don_dep_thu_muc()
+    print("Hoàn tất!")
