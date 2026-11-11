@@ -1,0 +1,166 @@
+import json
+import os
+from datetime import datetime, date
+from collections import defaultdict
+
+DATA_FILE = "expenses.json"
+
+# Các danh mục mặc định (bạn có thể chỉnh)
+CATEGORIES = [
+    "Ăn uống", "Di chuyển", "Mua sắm", "Hóa đơn",
+    "Giải trí", "Sức khỏe", "Học tập", "Khác"
+]
+
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        return []
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def add_expense():
+    print("\n=== THÊM CHI TIÊU ===")
+    try:
+        amount = float(input("Số tiền (VND): ").replace(",", "").strip())
+        if amount <= 0:
+            print("Số tiền phải lớn hơn 0!")
+            return
+    except ValueError:
+        print("Số tiền không hợp lệ!")
+        return
+
+    print("\nDanh mục:")
+    for i, cat in enumerate(CATEGORIES, 1):
+        print(f"  {i}. {cat}")
+    
+    try:
+        choice = int(input("Chọn danh mục (số): "))
+        category = CATEGORIES[choice - 1]
+    except (ValueError, IndexError):
+        category = "Khác"
+
+    note = input("Ghi chú (Enter để bỏ qua): ").strip()
+    today = date.today().isoformat()
+
+    expense = {
+        "id": datetime.now().strftime("%Y%m%d%H%M%S"),
+        "date": today,
+        "amount": amount,
+        "category": category,
+        "note": note
+    }
+
+    data = load_data()
+    data.append(expense)
+    save_data(data)
+    print(f"\n✅ Đã thêm: {amount:,.0f} VND - {category}")
+
+def show_today():
+    data = load_data()
+    today = date.today().isoformat()
+    today_expenses = [e for e in data if e["date"] == today]
+
+    print(f"\n=== CHI TIÊU HÔM NAY ({today}) ===")
+    if not today_expenses:
+        print("Chưa có chi tiêu nào hôm nay.")
+        return
+
+    total = 0
+    for e in today_expenses:
+        print(f"• {e['amount']:>10,.0f} VND | {e['category']:<12} | {e['note']}")
+        total += e["amount"]
+    print("-" * 50)
+    print(f"Tổng hôm nay: {total:,.0f} VND")
+
+def show_month():
+    data = load_data()
+    now = datetime.now()
+    year_month = now.strftime("%Y-%m")
+
+    month_expenses = [e for e in data if e["date"].startswith(year_month)]
+
+    print(f"\n=== CHI TIÊU THÁNG {now.month}/{now.year} ===")
+    if not month_expenses:
+        print("Chưa có dữ liệu tháng này.")
+        return
+
+    total = 0
+    by_category = defaultdict(float)
+
+    for e in month_expenses:
+        total += e["amount"]
+        by_category[e["category"]] += e["amount"]
+
+    print(f"Tổng chi tiêu: {total:,.0f} VND\n")
+    print("Theo danh mục:")
+    for cat, amount in sorted(by_category.items(), key=lambda x: x[1], reverse=True):
+        percent = (amount / total * 100) if total > 0 else 0
+        print(f"  {cat:<15}: {amount:>12,.0f} VND  ({percent:.1f}%)")
+
+def show_all():
+    data = load_data()
+    if not data:
+        print("\nChưa có dữ liệu nào.")
+        return
+
+    print("\n=== TẤT CẢ CHI TIÊU ===")
+    for e in sorted(data, key=lambda x: x["date"], reverse=True):
+        print(f"{e['date']} | {e['amount']:>10,.0f} VND | {e['category']:<12} | {e['note']}")
+
+def delete_expense():
+    data = load_data()
+    if not data:
+        print("\nKhông có dữ liệu để xóa.")
+        return
+
+    print("\n=== XÓA CHI TIÊU ===")
+    for i, e in enumerate(data[-10:], 1):  # chỉ hiện 10 cái gần nhất
+        print(f"{i}. {e['date']} - {e['amount']:,.0f} VND - {e['category']} - {e['note']}")
+
+    try:
+        idx = int(input("\nChọn số muốn xóa (0 để hủy): "))
+        if idx == 0:
+            return
+        # Xóa theo index trong 10 cái gần nhất
+        real_index = len(data) - 10 + idx - 1 if len(data) > 10 else idx - 1
+        deleted = data.pop(real_index)
+        save_data(data)
+        print(f"✅ Đã xóa: {deleted['amount']:,.0f} VND - {deleted['category']}")
+    except (ValueError, IndexError):
+        print("Lựa chọn không hợp lệ!")
+
+def main():
+    while True:
+        print("\n" + "="*40)
+        print("   THEO DÕI CHI TIÊU HÀNG NGÀY")
+        print("="*40)
+        print("1. Thêm chi tiêu")
+        print("2. Xem chi tiêu hôm nay")
+        print("3. Xem thống kê tháng này")
+        print("4. Xem tất cả")
+        print("5. Xóa chi tiêu")
+        print("0. Thoát")
+        
+        choice = input("\nChọn chức năng: ").strip()
+
+        if choice == "1":
+            add_expense()
+        elif choice == "2":
+            show_today()
+        elif choice == "3":
+            show_month()
+        elif choice == "4":
+            show_all()
+        elif choice == "5":
+            delete_expense()
+        elif choice == "0":
+            print("Tạm biệt! Hẹn gặp lại.")
+            break
+        else:
+            print("Lựa chọn không hợp lệ!")
+
+if __name__ == "__main__":
+    main()
