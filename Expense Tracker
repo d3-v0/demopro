@@ -1,0 +1,294 @@
+import customtkinter as ctk
+from tkinter import messagebox, ttk
+import json
+import os
+from datetime import datetime
+from collections import defaultdict
+
+# Cấu hình giao diện
+ctk.set_appearance_mode("System")  # System, Dark, Light
+ctk.set_default_color_theme("blue")
+
+DATA_FILE = "expenses.json"
+
+class ExpenseTracker(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("Quản Lý Chi Tiêu Cá Nhân")
+        self.geometry("900x650")
+        self.minsize(800, 600)
+
+        # Dữ liệu
+        self.expenses = self.load_data()
+        self.categories = ["Ăn uống", "Di chuyển", "Mua sắm", "Giải trí", "Hóa đơn", "Sức khỏe", "Khác"]
+
+        self.create_widgets()
+        self.refresh_table()
+        self.update_stats()
+
+    def load_data(self):
+        if os.path.exists(DATA_FILE):
+            try:
+                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except:
+                return []
+        return []
+
+    def save_data(self):
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(self.expenses, f, ensure_ascii=False, indent=2)
+
+    def create_widgets(self):
+        # ===== Header =====
+        header = ctk.CTkLabel(
+            self, 
+            text="💰 Quản Lý Chi Tiêu Cá Nhân", 
+            font=ctk.CTkFont(size=24, weight="bold")
+        )
+        header.pack(pady=(15, 10))
+
+        # ===== Form thêm chi tiêu =====
+        form_frame = ctk.CTkFrame(self)
+        form_frame.pack(fill="x", padx=20, pady=10)
+
+        # Ngày
+        ctk.CTkLabel(form_frame, text="Ngày:").grid(row=0, column=0, padx=10, pady=8, sticky="w")
+        self.date_entry = ctk.CTkEntry(form_frame, width=140)
+        self.date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+        self.date_entry.grid(row=0, column=1, padx=5, pady=8)
+
+        # Danh mục
+        ctk.CTkLabel(form_frame, text="Danh mục:").grid(row=0, column=2, padx=10, pady=8, sticky="w")
+        self.category_combo = ctk.CTkComboBox(form_frame, values=self.categories, width=140)
+        self.category_combo.set("Ăn uống")
+        self.category_combo.grid(row=0, column=3, padx=5, pady=8)
+
+        # Số tiền
+        ctk.CTkLabel(form_frame, text="Số tiền (VNĐ):").grid(row=0, column=4, padx=10, pady=8, sticky="w")
+        self.amount_entry = ctk.CTkEntry(form_frame, width=140)
+        self.amount_entry.grid(row=0, column=5, padx=5, pady=8)
+
+        # Ghi chú
+        ctk.CTkLabel(form_frame, text="Ghi chú:").grid(row=1, column=0, padx=10, pady=8, sticky="w")
+        self.note_entry = ctk.CTkEntry(form_frame, width=400)
+        self.note_entry.grid(row=1, column=1, columnspan=3, padx=5, pady=8, sticky="ew")
+
+        # Nút thêm
+        self.add_btn = ctk.CTkButton(
+            form_frame, 
+            text="➕ Thêm chi tiêu", 
+            command=self.add_expense,
+            width=140,
+            fg_color="#2ecc71",
+            hover_color="#27ae60"
+        )
+        self.add_btn.grid(row=1, column=5, padx=10, pady=8)
+
+        # ===== Bộ lọc =====
+        filter_frame = ctk.CTkFrame(self)
+        filter_frame.pack(fill="x", padx=20, pady=5)
+
+        ctk.CTkLabel(filter_frame, text="Lọc theo danh mục:").pack(side="left", padx=10)
+        self.filter_combo = ctk.CTkComboBox(
+            filter_frame, 
+            values=["Tất cả"] + self.categories,
+            width=150,
+            command=self.apply_filter
+        )
+        self.filter_combo.set("Tất cả")
+        self.filter_combo.pack(side="left", padx=5)
+
+        ctk.CTkLabel(filter_frame, text="Tháng:").pack(side="left", padx=(20, 5))
+        self.month_combo = ctk.CTkComboBox(
+            filter_frame,
+            values=["Tất cả"] + [f"{i:02d}" for i in range(1, 13)],
+            width=100,
+            command=self.apply_filter
+        )
+        self.month_combo.set("Tất cả")
+        self.month_combo.pack(side="left", padx=5)
+
+        self.delete_btn = ctk.CTkButton(
+            filter_frame,
+            text="🗑️ Xóa mục đã chọn",
+            command=self.delete_expense,
+            fg_color="#e74c3c",
+            hover_color="#c0392b",
+            width=150
+        )
+        self.delete_btn.pack(side="right", padx=10)
+
+        # ===== Bảng dữ liệu =====
+        table_frame = ctk.CTkFrame(self)
+        table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # Tạo Treeview
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Treeview", 
+                        background="#2b2b2b",
+                        foreground="white",
+                        fieldbackground="#2b2b2b",
+                        rowheight=28)
+        style.configure("Treeview.Heading", 
+                        background="#1f538d",
+                        foreground="white",
+                        font=("Arial", 11, "bold"))
+        style.map("Treeview", background=[("selected", "#1f538d")])
+
+        columns = ("id", "date", "category", "amount", "note")
+        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
+
+        self.tree.heading("id", text="ID")
+        self.tree.heading("date", text="Ngày")
+        self.tree.heading("category", text="Danh mục")
+        self.tree.heading("amount", text="Số tiền (VNĐ)")
+        self.tree.heading("note", text="Ghi chú")
+
+        self.tree.column("id", width=50, anchor="center")
+        self.tree.column("date", width=110, anchor="center")
+        self.tree.column("category", width=120, anchor="center")
+        self.tree.column("amount", width=140, anchor="e")
+        self.tree.column("note", width=300)
+
+        scrollbar = ctk.CTkScrollbar(table_frame, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+
+        self.tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # ===== Thống kê =====
+        self.stats_frame = ctk.CTkFrame(self)
+        self.stats_frame.pack(fill="x", padx=20, pady=(0, 15))
+
+        self.total_label = ctk.CTkLabel(
+            self.stats_frame, 
+            text="Tổng chi tiêu: 0 VNĐ", 
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        self.total_label.pack(side="left", padx=15, pady=10)
+
+        self.stats_label = ctk.CTkLabel(
+            self.stats_frame, 
+            text="", 
+            font=ctk.CTkFont(size=13)
+        )
+        self.stats_label.pack(side="left", padx=20, pady=10)
+
+    def add_expense(self):
+        date = self.date_entry.get().strip()
+        category = self.category_combo.get()
+        amount_str = self.amount_entry.get().strip().replace(",", "").replace(".", "")
+        note = self.note_entry.get().strip()
+
+        # Kiểm tra dữ liệu
+        if not date or not amount_str:
+            messagebox.showwarning("Thiếu thông tin", "Vui lòng nhập ngày và số tiền!")
+            return
+
+        try:
+            amount = int(amount_str)
+            if amount <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Lỗi", "Số tiền phải là số nguyên dương!")
+            return
+
+        # Kiểm tra định dạng ngày
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            messagebox.showerror("Lỗi", "Ngày phải theo định dạng YYYY-MM-DD!")
+            return
+
+        # Thêm vào danh sách
+        new_id = max([e["id"] for e in self.expenses], default=0) + 1
+        expense = {
+            "id": new_id,
+            "date": date,
+            "category": category,
+            "amount": amount,
+            "note": note
+        }
+        self.expenses.append(expense)
+        self.save_data()
+
+        # Reset form
+        self.amount_entry.delete(0, "end")
+        self.note_entry.delete(0, "end")
+
+        self.refresh_table()
+        self.update_stats()
+        messagebox.showinfo("Thành công", "Đã thêm chi tiêu!")
+
+    def delete_expense(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Chưa chọn", "Vui lòng chọn một dòng để xóa!")
+            return
+
+        item = self.tree.item(selected[0])
+        expense_id = int(item["values"][0])
+
+        confirm = messagebox.askyesno("Xác nhận", f"Bạn có chắc muốn xóa chi tiêu ID {expense_id}?")
+        if confirm:
+            self.expenses = [e for e in self.expenses if e["id"] != expense_id]
+            self.save_data()
+            self.refresh_table()
+            self.update_stats()
+
+    def apply_filter(self, *args):
+        self.refresh_table()
+
+    def refresh_table(self):
+        # Xóa dữ liệu cũ
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        category_filter = self.filter_combo.get()
+        month_filter = self.month_combo.get()
+
+        filtered = self.expenses
+
+        if category_filter != "Tất cả":
+            filtered = [e for e in filtered if e["category"] == category_filter]
+
+        if month_filter != "Tất cả":
+            filtered = [e for e in filtered if e["date"][5:7] == month_filter]
+
+        # Sắp xếp theo ngày mới nhất
+        filtered = sorted(filtered, key=lambda x: x["date"], reverse=True)
+
+        for e in filtered:
+            amount_formatted = f"{e['amount']:,}"
+            self.tree.insert("", "end", values=(
+                e["id"],
+                e["date"],
+                e["category"],
+                amount_formatted,
+                e["note"]
+            ))
+
+    def update_stats(self):
+        if not self.expenses:
+            self.total_label.configure(text="Tổng chi tiêu: 0 VNĐ")
+            self.stats_label.configure(text="")
+            return
+
+        total = sum(e["amount"] for e in self.expenses)
+        self.total_label.configure(text=f"Tổng chi tiêu: {total:,} VNĐ")
+
+        # Thống kê theo danh mục
+        by_category = defaultdict(int)
+        for e in self.expenses:
+            by_category[e["category"]] += e["amount"]
+
+        stats_text = " | ".join([f"{k}: {v:,}" for k, v in sorted(by_category.items(), key=lambda x: -x[1])])
+        self.stats_label.configure(text=stats_text)
+
+
+if __name__ == "__main__":
+    app = ExpenseTracker()
+    app.mainloop()
